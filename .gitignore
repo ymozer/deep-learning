@@ -1,0 +1,15 @@
+/venv
+/.idea
+/.vscode
+/.pytest_cache
+
+
+**/__pycache__
+
+/datasets/BDMediLeaves/BDMediLeaves_TrainValTest/**
+/datasets/BDMediLeaves/BDMediLeaves_Augmented/**
+/datasets/kvasir/kvasir-dataset-v2/**
+/datasets/kvasir/kvasir-dataset-v2-features/**
+
+
+**/.DS_Store
