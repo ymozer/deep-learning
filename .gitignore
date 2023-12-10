@@ -11,5 +11,15 @@
 /datasets/kvasir/kvasir-dataset-v2/**
 /datasets/kvasir/kvasir-dataset-v2-features/**
 
+**/*.ckpt
+**/*.pth
+**/*.pt
+**/*.pkl
+**/*.model
+**/*.h5
+**/*.hdf5
+**/*.ipynb_checkpoints
+**/*.log
+
 
 **/.DS_Store
