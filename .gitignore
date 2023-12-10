@@ -8,6 +8,8 @@
 
 /datasets/BDMediLeaves/BDMediLeaves_TrainValTest/**
 /datasets/BDMediLeaves/BDMediLeaves_Augmented/**
+/datasets/BDMediLeaves/BDMediLeaves Dataset - Augmented/**
+/datasets/BDMediLeaves/BDMediLeaves Dataset Original - TrainValTest/**
 /datasets/kvasir/kvasir-dataset-v2/**
 /datasets/kvasir/kvasir-dataset-v2-features/**
 
@@ -20,6 +22,12 @@
 **/*.hdf5
 **/*.ipynb_checkpoints
 **/*.log
+**/*.zip
+**/*.tar
+**/*.gz
+**/*.rar
+**/*.7z
+
 
 
 **/.DS_Store

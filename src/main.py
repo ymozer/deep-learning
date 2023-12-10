@@ -17,17 +17,9 @@ from torchvision.models import resnet50, densenet201, efficientnet_v2_m, Efficie
 from torch.utils.data import DataLoader, random_split
 import torch.optim as optim
 import torch.nn as nn
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from PIL import Image
-from torchvision.transforms.transforms import ToTensor
 
-from PIL import Image, ImageOps, ImageEnhance
 
-#torch.set_default_device("mps")
-import click
+
 
 def print_left_and_right_aligned(left_text, right_text):
     terminal_width = shutil.get_terminal_size().columns
@@ -63,7 +55,7 @@ class SimpleCNN(nn.Module):
         return x
     
 class CNN(nn.Module):
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=10, device=None):
         super(CNN, self).__init__()
         self.num_classes = num_classes
         # Define the feature extraction part
@@ -71,12 +63,12 @@ class CNN(nn.Module):
             nn.Conv2d(3, 64, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
-        )
+        ).to(device)
         
         # The classifier will be defined later in the forward method
         self.classifier = None
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Forward pass through the feature extraction part
         x = self.features(x)
         
@@ -90,19 +82,21 @@ class CNN(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.Dropout(0.5),
                 nn.Linear(1024, self.num_classes),
-            )
+            ).to(device)
         
         # Flatten the output for the classification part
-        x = x.view(x.size(0), -1)
+        x = x.view(x.size(0), -1).to(device)
         
         # Forward pass through the classification part
         x = self.classifier(x)
         return x
 
-def train_loop():
+def train_loop(device=None):
     epoch = 0
     loss=None
     step_count = 0
+    click.echo(click.style("Training started", fg="green"))
+    click.echo(click.style(f"Device:{device}", fg="green"))
     try:
         for epoch in range(num_epochs):
             train_loss = 0
@@ -113,13 +107,21 @@ def train_loop():
 
             for i, (images, labels) in enumerate(train_loader):
                 step_count = i + 1
-                images = images.to(device)
 
                 # convert all labels to numbers using labels_dict
                 labels = [labels_dict[label] for label in list(labels)]
                 labels = torch.tensor(labels, dtype=torch.long, device=device)
 
-                height, width = images.shape[-2], images.shape[-1]
+                # Move tensors to the configured device
+                images = images.to(device)
+                labels = labels.to(device)
+    
+                # check if images and labels are on the cuda if device is cuda
+                if device == torch.device('cuda'):
+                    print("Checking if images and labels are on the cuda if device is cuda")
+                    assert images.is_cuda
+                    assert labels.is_cuda
+                
 
                 # Forward pass
                 outputs = model(images)
@@ -136,9 +138,12 @@ def train_loop():
                 _, predicted = torch.max(outputs.data, 1)
                 correct = (predicted == labels).sum().item()
                 train_acc += correct / total
+                memory_alloc = torch.cuda.memory_allocated(torch.cuda.current_device())
+                memory_reserved = torch.cuda.memory_reserved(torch.cuda.current_device())
 
                 time_elapsed = time.time() - since
-                left_text = "Epoch [{}/{}], Step [{}/{}] Loss: {:.4f} Acc: {:.2f} images: {}".format(epoch + 1, num_epochs, i + 1, total_step, loss.item(), (correct / total) * 100, tuple(images.shape[2:4]))
+                left_text = "Epoch [{}/{}], Step [{}/{}] Loss: {:.4f} Acc: {:.2f} batch_len: {} memory: {:.2f}GB/{:.2f}GB".format(
+                    epoch + 1, num_epochs, i + 1, total_step, loss.item(), train_acc / (i + 1) * 100, batch_size, memory_alloc / 1e9, memory_reserved / 1e9)
                 right_text = "Time elapsed {:.0f}m {:.0f}s".format(time_elapsed // 60, time_elapsed % 60)
                 # time elapsed
                 print_left_and_right_aligned(left_text, right_text)
@@ -150,14 +155,14 @@ def train_loop():
     except KeyboardInterrupt:
         click.echo(click.style(f"Training interrupted at {step_count}/{total_step}", fg="red"))
         click.echo(click.style("Saving model", fg="green"))
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
-        }, f"model.ckpt")
-        click.echo(click.style("Model saved", fg="green"))
-        sys.exit(0)
+       #torch.save({
+       #    'epoch': epoch,
+       #    'model_state_dict': model.state_dict(),
+       #    'optimizer_state_dict': optimizer.state_dict(),
+       #    'loss': loss,
+       #}, f"model.ckpt")
+       #click.echo(click.style("Model saved", fg="green"))
+       #sys.exit(0)
 
 
 if __name__ == "__main__":
@@ -180,7 +185,7 @@ if __name__ == "__main__":
     # Set device MPS
     # Check that MPS is available
     if torch.cuda.is_available():
-        device = torch.device('cuda')
+        device = torch.device('cuda:0')
     elif torch.backends.mps.is_available():
         device = torch.device('mps')
     else:
@@ -189,7 +194,7 @@ if __name__ == "__main__":
     click.echo(click.style(f"Device:\t\t\t\t{device}", fg="green"))
 
     # Load dataset and apply transformations
-    train = BDML.BDML(split="Train", transform=train_transform, augment=True)
+    train = BDML.BDML(split="Train", transform=train_transform, augment=True, download=True)
     test = BDML.BDML(split="Test", transform=test_transform)
     validation = BDML.BDML(split="Validation", transform=test_transform)
     click.echo(click.style(f"train dataset length:\t\t{len(train)}", fg="green"))
@@ -197,11 +202,17 @@ if __name__ == "__main__":
     click.echo(click.style(f"validation dataset length:\t{len(validation)}", fg="green"))
 
     device = None
+    if torch.cuda.is_available():
+        device = torch.device('cuda:0')
+    elif torch.backends.mps.is_available():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
 
 
     # Hyperparameters
     num_epochs = 3
-    batch_size = 10
+    batch_size = 128
     learning_rate = 0.001
 
     # Data loaders
@@ -229,7 +240,7 @@ if __name__ == "__main__":
     #model = resnet50(pretrained=True)
     #model = densenet201(pretrained=True)
     #model = efficientnet_v2_m(weights=EfficientNet_V2_M_Weights.DEFAULT, progress=True)
-    model = CNN(num_classes=10)
+    model = CNN(num_classes=10, device=device)
     model = model.to(device)
     
     # Loss and optimizer
@@ -267,11 +278,11 @@ if __name__ == "__main__":
         loss = checkpoint['loss']
         click.echo(click.style("Model loaded", fg="green"))
         model.train()
-        train_loop()
+        train_loop(device=device)
     else:
         click.echo(click.style("Model not found", fg="red"))
         click.echo(click.style("Training model", fg="green"))
-        train_loop()
+        train_loop(device=device)
     
     
 
