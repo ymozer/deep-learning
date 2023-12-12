@@ -46,27 +46,30 @@ class BDML(VisionDataset):
         super().__init__(root= "datasets", transform=transform,
                          target_transform=target_transform)
         self.base_folder = pathlib.Path().absolute()
-        
+
         if download:
             self.download()
 
         if augment:
             selected_set = self.base_folder / "datasets" / \
-                "BDMediLeaves" / "BDMediLeaves Dataset - Augmented"
-            plant_classes_dir = os.listdir(selected_set)
-            # save rar files in array
-            rar_files = [
-                item for item in plant_classes_dir if item.endswith(".rar")]
-            if len(rar_files) == 10:
+                "BDMediLeaves" / "BDMediLeaves A leaf images dataset for Bangladeshi medicinal plants identification" / "BDMediLeaves Dataset - Augmented"
+            # list all directories in augmented folder if path is directory
+            dirs_in_augmented = [item for item in os.listdir(
+                selected_set) if os.path.isdir(selected_set / item)]
+            print(dirs_in_augmented)
+            plant_classes_rar = os.listdir(selected_set)
+            rar_files = [item for item in plant_classes_rar if item.endswith(".rar")]
+
+            # check if all rar files are present and not extracted
+            if len(rar_files) == 10 and not len(dirs_in_augmented) == 10:
                 print("All rar files are present")
-            else:
                 # extract rar files
                 for rar_file in rar_files:
                     path = selected_set / rar_file
-                    patoolib.extract_archive(str(path), outdir=selected_set) 
-             
-            plant_class_filtered_list = [
-                item for item in plant_classes_dir if not item.endswith(".rar")]
+                    patoolib.extract_archive(str(path), outdir=selected_set)
+            
+            plant_classes_dir=os.listdir(selected_set)
+            plant_class_filtered_list = [item for item in plant_classes_dir if not item.endswith(".rar")]
             if ".DS_Store" in plant_class_filtered_list:
                 plant_class_filtered_list.remove(".DS_Store")
 
@@ -90,7 +93,8 @@ class BDML(VisionDataset):
         else:
             train_test_val_selection = self._RESOURCES[self._split]
             selected_set = self.base_folder / "datasets" / "BDMediLeaves" / \
-                "BDMediLeaves Dataset Original - TrainValTest" / \
+                "BDMediLeaves A leaf images dataset for Bangladeshi medicinal plants identification" / \
+                    "BDMediLeaves Dataset Original - TrainValTest" / \
                 train_test_val_selection[0]
             plant_classes_dir = os.listdir(selected_set)
             self.df = pd.DataFrame(columns=["image", "label"])
@@ -131,9 +135,8 @@ class BDML(VisionDataset):
 
         if os.path.isfile(download_root / filename):
             print("File already downloaded")
-            return
         else:
-            # use tqdm for progress bar
+            print("Downloading BDMediLeaves...")
             # add stream=True to enable streaming
             r = requests.get(url, allow_redirects=True, stream=True)
             # get the total size of the file
@@ -144,6 +147,8 @@ class BDML(VisionDataset):
                     if chunk:  # filter out keep-alive new chunks
                         f.write(chunk)
             '''
+            # TODO: check integrity not working properly
+            # even though the file is downloaded correctly, the hash value is not matching
             if check_integrity(download_root / filename, hash_value):
                 print("File already downloaded and verified")
             else:
@@ -153,18 +158,20 @@ class BDML(VisionDataset):
 
             '''
 
-            main_file = self.base_folder / "datasets" / "BDMediLeaves" / \
-                "BDMediLeaves A leaf images dataset for Bangladeshi medicinal plants identification"
+        main_file = self.base_folder / "datasets" / "BDMediLeaves" / \
+            "BDMediLeaves A leaf images dataset for Bangladeshi medicinal plants identification.zip"
+        extracted_folder = self.base_folder / "datasets" / "BDMediLeaves" / \
+            "BDMediLeaves A leaf images dataset for Bangladeshi medicinal plants identification"
 
-            if not os.path.isdir(main_file):
-                patoolib.extract_archive(
-                    main_file, outdir=self.base_folder / "datasets" / "BDMediLeaves")
-            else:
-                print("Main file already extracted")
+        if os.path.exists(main_file) and os.path.isfile(main_file) and \
+            os.path.getsize(main_file) > 0 and \
+            not os.path.exists(extracted_folder):
 
-            if not os.path.isdir(main_file):
-                raise RuntimeError("Dataset not found or corrupted.\
-                                    You can use download=True to download it")
+            print("Extracting BDMediLeaves...")
+            patoolib.extract_archive(str(main_file), outdir=download_root)
+            print("Extraction completed")
+        else:
+            print("Extraction not required")
 
         
 
