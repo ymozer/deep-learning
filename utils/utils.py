@@ -1,8 +1,28 @@
+import PIL
+from PIL import Image
+import io
 import shutil
 import time
 import click
 import threading
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import pygad
+import torch
+
+
+def fitness_func(solution, solution_idx):
+    global model
+    model_weights = pygad.torchga.model_weights_as_dict(
+        model=model, weights_vector=solution)
+    model.load_state_dict(model_weights)
+    predictions = model(torch.tensor(
+        [[1, 1, 1], [2, 2, 2], [3, 3, 3]]).float())
+    error = torch.nn.functional.mse_loss(
+        predictions, torch.tensor([[1], [2], [3]]).float())
+    fitness = 1.0 / error
+    return fitness
 
 
 def print_left_and_right_aligned(left_text, right_text):
@@ -25,16 +45,29 @@ def convert_seconds(seconds):
   return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 def plot_loss_and_accuracy(train_loss_list, train_acc_list, validation_loss_list, validation_acc_list):
-  plt.figure(figsize=(10, 10))
-  plt.subplot(2, 1, 1)
-  plt.plot(train_loss_list, label="Train loss")
+  """Plot loss and accuracy of training and validation per epoch"""
+  plt.figure(figsize=(20, 10))
+  plt.subplot(1, 2, 1)
+  plt.plot(train_loss_list, label="Training loss")
   plt.plot(validation_loss_list, label="Validation loss")
-  plt.legend()
-  plt.subplot(2, 1, 2)
-  plt.plot(train_acc_list, label="Train accuracy")
+  plt.legend(frameon=False)
+  plt.xlabel("Epoch")
+  plt.ylabel("Loss")
+  plt.title("Loss per epoch")
+  plt.subplot(1, 2, 2)
+  plt.plot(train_acc_list, label="Training accuracy")
   plt.plot(validation_acc_list, label="Validation accuracy")
-  plt.legend()
-  plt.show()
+  plt.legend(frameon=False)
+  plt.xlabel("Epoch")
+  plt.ylabel("Accuracy")
+  plt.title("Accuracy per epoch")
+  plt.tight_layout()
+  # return plt as PIL image
+  img_buf = io.BytesIO()
+  plt.savefig(img_buf, format='png')
+  img_buf.seek(0)
+  return Image.open(img_buf)
+
 
 
 class TimerThread(threading.Thread):
