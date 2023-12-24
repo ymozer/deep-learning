@@ -52,7 +52,7 @@ class TrainLoop(threading.Thread):
     def plot_loss_and_accuracy(self, training_loss_list, training_acc_per_epoch, validation_loss_list, validation_acc_per_epoch):
         pil_image= plot_loss_and_accuracy(training_loss_list, training_acc_per_epoch, validation_loss_list, validation_acc_per_epoch)
         filesplitted=re.split("[']", str(type(model)))
-        pil_image.save(f"model_{filesplitted[1]}_e{self.epoch_broadcast+1}_augment{args.augment}.png")
+        pil_image.save(f"model_{filesplitted[1]}_e{self.epoch_broadcast+1}_augment{args.augment}_lr{str(learning_rate).replace('.','o')}.png")
         
     def accuracy(self, network, dataloader):
         network.eval()
@@ -163,7 +163,7 @@ class TrainLoop(threading.Thread):
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss_list': self.training_loss_list,
                 'criterion': criterion,
-            }, f"model_{model_str}_augment{args.augment}_epoch{self.epoch_broadcast+1}.ckpt")
+            }, f"model_{model_str}_augment{args.augment}_epoch{self.epoch_broadcast+1}_lr{learning_rate}.ckpt")
             click.echo(click.style(f"Model saved to model_{model_str}.ckpt", fg="green"))
             return self.training_loss_list, self.training_acc_per_epoch, self.validation_loss_list, self.validation_acc_per_epoch
 
@@ -228,33 +228,26 @@ def test_func(model):
     model = model.to(device)
 
     click.echo(click.style("Model loaded", fg="green"))
-    click.echo(click.style(
-        f"Model path:\t\t\t{args.model_path}", fg="green"))
+    click.echo(click.style(f"Model path:\t\t\t{args.model_path}", fg="green"))
 
     test_transform = transform_resize_and_to_tensor()
     test = BDML.BDML(split="Test", transform=test_transform)
-    test_loader = DataLoader(
-        dataset=test, batch_size=batch_size, shuffle=False)
-    click.echo(click.style(
-        f"test dataset length:\t\t{len(test)}", fg="green"))
+    test_loader = DataLoader(dataset=test, batch_size=batch_size, shuffle=False)
+    click.echo(click.style(f"test dataset length:\t\t{len(test)}", fg="green"))
 
     if criterion is None:
         criterion = nn.CrossEntropyLoss()
 
-    test_loss_list, test_acc_list = test_model(
-        model, test_loader, device, criterion, labels_dict)
+    test_loss_list, test_acc_list = test_model(model, test_loader, device, criterion, labels_dict)
+
     # format 2 decimal places
     test_loss_list = [round(x, 2) for x in test_loss_list]
     test_acc_list = [round(x, 2) for x in test_acc_list]
 
-    click.echo(click.style(
-        f"Test loss:\t\t\t{np.min(test_loss_list)}", fg="green"))
-    click.echo(click.style(
-        f"Test accuracy:\t\t\t{np.max(test_acc_list)}", fg="green"))
-    click.echo(click.style(
-        f"Test loss list:\t\t\t{test_loss_list}", fg="green"))
-    click.echo(click.style(
-        f"Test accuracy list:\t\t{test_acc_list}", fg="green"))
+    click.echo(click.style(f"Test loss:\t\t\t{np.min(test_loss_list)}", fg="green"))
+    click.echo(click.style(f"Test accuracy:\t\t\t{np.max(test_acc_list)}", fg="green"))
+    click.echo(click.style(f"Test loss list:\t\t\t{test_loss_list}", fg="green"))
+    click.echo(click.style(f"Test accuracy list:\t\t{test_acc_list}", fg="green"))
     
 def model_selection(model, device):
     if model == "CNN":
@@ -274,6 +267,24 @@ def model_selection(model, device):
         model = DenseNet201_Weights()
     elif model == "ResNet50Weights":
         model = resnet50(weights=ResNet50_Weights)
+    elif model == "InceptionV3":
+        from torchvision.models import inception_v3
+        model = inception_v3()
+    elif model == "InceptionV3Weights":
+        from torchvision.models import inception_v3, Inception_V3_Weights
+        model = inception_v3(weights=Inception_V3_Weights.DEFAULT)  
+    elif model == "MobileNetV3Small":
+        from torchvision.models import mobilenet_v3_small
+        model = mobilenet_v3_small()  
+    elif model == "MobileNetV3SmallWeights":
+        from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights 
+        model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT)
+    elif model == "MobileNetV3Large":
+        from torchvision.models import mobilenet_v3_large
+        model = mobilenet_v3_large()
+    elif model == "MobileNetV3LargeWeights":
+        from torchvision.models import mobilenet_v3_large, MobileNet_V3_Large_Weights
+        model = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
     else:
         click.echo(click.style(f"Model {type(model)} not found", fg="red"))
         sys.exit(1)
@@ -406,10 +417,8 @@ if __name__ == "__main__":
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss_list': train_loop.training_loss_list,
                     'criterion': criterion,
-                }, f"model_{model_str}_augment{args.augment}_epoch{train_loop.epoch_broadcast}.ckpt")
-                print(train_loop.epoch_broadcast)
-                print(train_loop.loss_broadcast)
-                sys.exit(0)
+                }, f"model_{model_str}_augment{args.augment}_epoch{train_loop.epoch_broadcast}_lr{learning_rate}.ckpt")
+                sys.exit(0) 
             finally:
                 if args.test:
                     click.echo(click.style("Testing model", fg="green"))

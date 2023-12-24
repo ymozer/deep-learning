@@ -38,7 +38,8 @@ class BDML(VisionDataset):
             split: str = "train",
             download: bool = False,
             transform: Optional[Callable] = None,
-            target_transform: Optional[Callable] = None
+            target_transform: Optional[Callable] = None,
+            selected_plant_class: Optional[str] = None
     ) -> None:
         self.df = None
         self._split = verify_str_arg(
@@ -56,7 +57,6 @@ class BDML(VisionDataset):
             # list all directories in augmented folder if path is directory
             dirs_in_augmented = [item for item in os.listdir(
                 selected_set) if os.path.isdir(selected_set / item)]
-            print(dirs_in_augmented)
             plant_classes_rar = os.listdir(selected_set)
             rar_files = [item for item in plant_classes_rar if item.endswith(".rar")]
 
@@ -78,32 +78,41 @@ class BDML(VisionDataset):
             else:
                 raise RuntimeError("Plant classes are missing")
 
-            self.df = pd.DataFrame(
-                columns=["imagepath", "label", "plant_index", "image_index"])
+            self.df = pd.DataFrame(columns=["imagepath", "label", "plant_index", "image_index"])
+
+            # ------------------------------------------------------------------------------------------------
+
 
             for plant_class in plant_class_filtered_list:
                 images = os.listdir(selected_set / plant_class)
                 for image in images:
-                    self.df = self.df._append({
-                        "imagepath": str(selected_set / plant_class / image),
-                        "label": plant_class,
-                        "plant_index": plant_class_filtered_list.index(plant_class),
-                        "image_index": images.index(image)}, ignore_index=True
-                    )
+                    self.df = self.df._append(
+                        {
+                            "imagepath": str(selected_set / plant_class / image),
+                            "label": plant_class,
+                            "plant_index": plant_class_filtered_list.index(plant_class),
+                            "image_index": images.index(image)
+                        }, ignore_index=True)
         else:
             train_test_val_selection = self._RESOURCES[self._split]
             selected_set = self.base_folder / "datasets" / "BDMediLeaves" / \
                 "BDMediLeaves A leaf images dataset for Bangladeshi medicinal plants identification" / \
-                    "BDMediLeaves Dataset Original - TrainValTest" / \
-                train_test_val_selection[0]
+                    "BDMediLeaves Dataset Original - TrainValTest" / train_test_val_selection[0]
             plant_classes_dir = os.listdir(selected_set)
             self.df = pd.DataFrame(columns=["image", "label"])
 
             for plant_class in plant_classes_dir:
                 images = os.listdir(selected_set / plant_class)
                 for image in images:
-                    self.df = self.df._append({"image": str(
-                        selected_set / plant_class / image), "label": plant_class}, ignore_index=True)
+                    self.df = self.df._append(
+                        {
+                            "image": str(selected_set / plant_class / image), 
+                            "label": plant_class,
+                        }, ignore_index=True)
+
+        if selected_plant_class is not None:
+            #print(f"Filtering dataset for plant class {selected_plant_class}")
+            self.df = self.df[self.df["label"] == selected_plant_class]
 
         self.transform = transform
         self.target_transform = target_transform
@@ -120,7 +129,7 @@ class BDML(VisionDataset):
         image = transform(image)
         return image, label
 
-    def resize(self, image, size):
+    def resize(self, image:Image, size:Tuple[int, int]) -> Image:
         return image.resize(size, Image.ANTIALIAS)
     
 
