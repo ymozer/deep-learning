@@ -11,12 +11,24 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 import datasets.BDMediLeaves.BDML_dataset as BDML
 from torcheval.metrics.classification.f1_score import MulticlassF1Score
+
 from torcheval.metrics.classification.precision import MulticlassPrecision
 from torcheval.metrics.classification.recall import MulticlassRecall
 from torcheval.metrics.classification.accuracy import MulticlassAccuracy
 
+
 from matplotlib import pyplot as plt
 from PIL import Image
+import pandas as pd
+
+# supreess future warnings
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
+# surpress warnings from torcheval
+import logging
+logging.getLogger("torcheval").setLevel(logging.ERROR)
+
 
 
 labels_dict = {
@@ -31,38 +43,6 @@ labels_dict = {
     "Phyllanthus emblica":    8,
     "Terminalia arjuna":      9,
 }
-
-def test_model(model, test_loader, device, criterion, labels_dict):
-  test_loss = 0
-  test_acc = 0
-  test_loss_list = []
-  test_acc_list = []
-
-  model.eval()
-  with torch.no_grad():
-    for images, labels in test_loader:
-      # convert all labels to numbers using labels_dict
-      labels = [labels_dict[label] for label in list(labels)]
-      labels = torch.tensor(labels, dtype=torch.long, device=device)
-
-      # Move tensors to the configured device
-      images = images.to(device)
-      labels = labels.to(device)
-
-      # Forward pass
-      outputs = model(images)
-      loss = criterion(outputs, labels)
-      test_loss += loss.item()
-
-      # Calculate accuracy
-      _, predicted = torch.max(outputs.data, 1)
-      correct = (predicted == labels).sum().item()
-      test_acc += correct / len(labels)
-
-      test_loss_list.append(loss.item())
-      test_acc_list.append(correct / len(labels))
-
-  return test_loss_list, test_acc_list
 
 def model_selection(model, device):
     if model == "CNN":
@@ -158,6 +138,7 @@ if __name__ == '__main__':
 
   #model=None
 
+  df_class = pd.DataFrame(columns=['algorithm', 'plant_class', 'f1_score', 'precision_score', 'recall_score', 'accuracy_score'])
   for model_path in models_path.items():
     checkpoint = torch.load(model_path[1]["path"], map_location=device)
     if "_" in model_path[0]:
@@ -200,7 +181,8 @@ if __name__ == '__main__':
       model.eval()
       model = model.to(device)
       test_dataset = BDML.BDML(split="Test", selected_plant_class=plant_class, transform=test_transform)
-      test_loader = DataLoader(test_dataset, batch_size=20, shuffle=False)
+      test_loader = DataLoader(test_dataset, batch_size=50, shuffle=False)
+      df_per_plant = pd.DataFrame(columns=['algorithm','plant_class', 'f1_score', 'precision_score', 'recall_score', 'accuracy_score'])
       for images, labels in test_loader:
         # convert all labels to numbers using labels_dict
         labels = [labels_dict[plant_class] for _ in range(len(images))]
@@ -218,13 +200,39 @@ if __name__ == '__main__':
         _, predicted = torch.max(outputs.data, 1)
         correct = (predicted == labels).sum().item()
         test_acc        = correct / len(labels)
-        f1_score        = f1        .update(outputs, labels)
-        precision_score = precision .update(outputs, labels)
-        recall_score    = recall    .update(outputs, labels)
-        accuracy_score  = accuracy  .update(outputs, labels)
+        f1        .update(predicted, labels)
+        precision .update(predicted, labels)
+        recall    .update(predicted, labels)
+        accuracy  .update(predicted, labels)
+        print(predicted)
+        print(labels)
 
-        print(test_acc, accuracy_score, f1_score, precision_score, recall_score, accuracy_score)
-        break
+        f1_score        = f1        .compute()
+        precision_score = precision .compute()
+        recall_score    = recall    .compute()
+        accuracy_score  = accuracy  .compute()
+        
+        print(f1_score.tolist(), f1_score.tolist(), precision_score.tolist(),  accuracy_score.tolist())
+        df_per_plant = df_per_plant._append(
+          {
+            'algorithm': model_path[0], # 'DenseNet201', 'MobileNetV3Large', 'EfficientNetV2M', 'ResNet50
+            'plant_class': plant_class, 
+            'f1_score': f1_score.tolist(), 
+            'precision_score': precision_score.tolist(), 
+            'recall_score': 0, 
+            'accuracy_score': accuracy_score.tolist()
+          }, ignore_index=True)
+        
+
+        f1.reset()
+        precision.reset()
+        recall.reset()
+        accuracy.reset()
+        df_class = df_class._append(df_per_plant, ignore_index=True)
+
+        print(f"Testing {model_path[0]} model on {plant_class} class finished")
+  df_class.to_csv("test_results.csv", index=False)
+
 
 
 
