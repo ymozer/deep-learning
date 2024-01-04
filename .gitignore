@@ -13,6 +13,7 @@
 /datasets/BDMediLeaves/BDMediLeaves A leaf images dataset for Bangladeshi medicinal plants identification
 /datasets/kvasir/kvasir-dataset-v2/**
 /datasets/kvasir/kvasir-dataset-v2-features/**
+/models/**
 
 **/*.ckpt
 **/*.pth

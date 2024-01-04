@@ -1,4 +1,4 @@
-$epoch = 10
+$epoch = 30
 $batch_size = 32
 $lr = 0.001
 
@@ -13,7 +13,8 @@ $scriptPath = "src\main.py"
 & $venvPath
 
 # Example ForEach loop with an array
-$model_names = @("EfficientNetV2M", "ResNet50", "DenseNet201", "MobileNetV3Large")
+#$model_names = @("EfficientNetV2M", "ResNet50", "DenseNet201", "MobileNetV3Large")
+$model_names = @("CNN2")
 
 # train loop 
 foreach ($model_name in $model_names) {
